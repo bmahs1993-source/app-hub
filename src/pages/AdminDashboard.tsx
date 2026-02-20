@@ -97,8 +97,16 @@ export const AdminDashboard: React.FC = () => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      let user;
+      const { data: authData } = await supabase.auth.getUser();
+      user = authData.user;
+
+      // Support demo session if real user is not found
+      if (!user && localStorage.getItem('nexus_demo_session') === 'true') {
+        user = { id: 'demo-user-id', email: 'admin@nexus.com' };
+      }
+
+      if (!user) throw new Error('User not authenticated. Please log in first.');
 
       const challenge = generateRandomChallenge();
       const userId = new TextEncoder().encode(user.id);

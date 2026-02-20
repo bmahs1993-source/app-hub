@@ -101,13 +101,19 @@ export const LoginPage: React.FC = () => {
       navigate('/admin');
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err.message || 'Failed to sign in. Please check your credentials.');
       
       // For demo purposes, if Supabase is not fully configured, allow bypass with specific credentials
       if (email === 'admin@nexus.com' && password === 'password123') {
         setError(null);
         localStorage.setItem('nexus_demo_session', 'true');
         navigate('/admin');
+        return;
+      }
+
+      setError(err.message || 'Failed to sign in. Please check your credentials.');
+      
+      if (err.message === 'Invalid login credentials') {
+        setError('Invalid credentials. Tip: Use admin@nexus.com / password123 for demo access.');
       }
     } finally {
       setLoading(false);
