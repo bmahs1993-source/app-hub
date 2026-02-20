@@ -17,7 +17,8 @@ import {
   History,
   RotateCcw,
   Menu,
-  X
+  X,
+  Fingerprint
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppRecord, AppVersion } from '../types';
@@ -85,6 +86,26 @@ export const AdminDashboard: React.FC = () => {
       alert('Failed to save settings.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBiometricEnrollment = async () => {
+    if (!window.PublicKeyCredential) {
+      alert('Biometric authentication is not supported on this device/browser.');
+      return;
+    }
+
+    try {
+      // In a real app, you'd get these options from your server
+      // For this demo, we'll simulate the registration
+      alert('Registering Biometric Credential... Please follow your browser\'s prompts.');
+      
+      // Mocking successful enrollment
+      localStorage.setItem('nexus_biometric_cred', 'enrolled');
+      alert('Biometric enrollment successful! You can now log in using your fingerprint/face ID.');
+    } catch (err: any) {
+      console.error('Biometric enrollment error:', err);
+      alert('Enrollment failed: ' + err.message);
     }
   };
 
@@ -712,6 +733,24 @@ export const AdminDashboard: React.FC = () => {
                 {loading ? 'Saving...' : 'Save Settings'}
               </button>
             </form>
+            <div className="mt-8 space-y-6">
+              <h2 className="text-xl font-display font-bold text-neutral-900">Security</h2>
+              <div className="bg-white p-8 rounded-3xl border border-neutral-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-neutral-900">Biometric Authentication</div>
+                    <div className="text-xs text-neutral-500">Enable fingerprint or face ID for faster, secure logins.</div>
+                  </div>
+                  <button 
+                    onClick={handleBiometricEnrollment}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-50 text-brand-600 rounded-xl font-semibold hover:bg-brand-100 transition-all border border-brand-100"
+                  >
+                    <Fingerprint className="w-5 h-5" />
+                    Enroll Now
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>

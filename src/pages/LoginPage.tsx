@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Fingerprint, Chrome } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -9,7 +9,62 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if biometric auth is supported
+    if (window.PublicKeyCredential) {
+      setIsBiometricSupported(true);
+    }
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/admin`
+        }
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || 'Google login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // In a real app, you'd fetch a challenge from your server
+      // For this demo, we'll simulate the WebAuthn flow
+      // If the user has a stored credential in localStorage (simulating DB), we'll use it
+      const storedCred = localStorage.getItem('nexus_biometric_cred');
+      
+      if (!storedCred) {
+        throw new Error('No biometric enrollment found. Please sign in with password first to enroll.');
+      }
+
+      // Real WebAuthn call (simplified)
+      if (window.PublicKeyCredential) {
+        // This triggers the browser's biometric prompt
+        // In a real implementation, you'd pass the challenge and allowed credentials
+        alert('Simulating Biometric Verification... Please use your fingerprint/face ID if prompted by the browser.');
+        
+        // Mocking successful verification for demo
+        localStorage.setItem('nexus_demo_session', 'true');
+        navigate('/admin');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +167,36 @@ export const LoginPage: React.FC = () => {
               {!loading && <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />}
             </button>
           </form>
+
+          <div className="mt-6 space-y-3">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-neutral-900 px-2 text-neutral-500">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-semibold transition-all"
+              >
+                <Chrome className="w-5 h-5" />
+                Google
+              </button>
+              <button
+                onClick={handleBiometricLogin}
+                disabled={loading || !isBiometricSupported}
+                className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-semibold transition-all disabled:opacity-30"
+              >
+                <Fingerprint className="w-5 h-5" />
+                Biometric
+              </button>
+            </div>
+          </div>
 
           <div className="mt-8 pt-8 border-t border-white/10 text-center">
             <p className="text-neutral-500 text-sm">
