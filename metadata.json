@@ -1,0 +1,9 @@
+{
+  "name": "Nexus App Store",
+  "description": "A modern, full-featured app store with admin management, app uploads, and public browsing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
