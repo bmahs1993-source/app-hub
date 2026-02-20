@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Fingerprint, Chrome } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { base64ToBuffer, generateRandomChallenge } from '../lib/webauthn';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -40,27 +41,45 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // In a real app, you'd fetch a challenge from your server
-      // For this demo, we'll simulate the WebAuthn flow
-      // If the user has a stored credential in localStorage (simulating DB), we'll use it
-      const storedCred = localStorage.getItem('nexus_biometric_cred');
+      const storedCredJson = localStorage.getItem('nexus_biometric_cred');
       
-      if (!storedCred) {
+      if (!storedCredJson) {
         throw new Error('No biometric enrollment found. Please sign in with password first to enroll.');
       }
 
-      // Real WebAuthn call (simplified)
-      if (window.PublicKeyCredential) {
-        // This triggers the browser's biometric prompt
-        // In a real implementation, you'd pass the challenge and allowed credentials
-        alert('Simulating Biometric Verification... Please use your fingerprint/face ID if prompted by the browser.');
-        
-        // Mocking successful verification for demo
-        localStorage.setItem('nexus_demo_session', 'true');
-        navigate('/admin');
-      }
+      const storedCred = JSON.parse(storedCredJson);
+      const challenge = generateRandomChallenge();
+
+      const options: PublicKeyCredentialRequestOptions = {
+        challenge,
+        rpId: window.location.hostname,
+        allowCredentials: [{
+          id: base64ToBuffer(storedCred.credentialId),
+          type: "public-key",
+        }],
+        userVerification: "required",
+        timeout: 60000,
+      };
+
+      const assertion = (await navigator.credentials.get({
+        publicKey: options,
+      })) as PublicKeyCredential;
+
+      if (!assertion) throw new Error('Biometric verification failed');
+
+      // In a real app, you'd send the assertion to your server to verify the signature
+      // For this demo, we'll assume success if the browser returns a valid assertion
+      console.log('Biometric assertion received:', assertion);
+      
+      localStorage.setItem('nexus_demo_session', 'true');
+      navigate('/admin');
     } catch (err: any) {
-      setError(err.message);
+      console.error('Biometric login error:', err);
+      if (err.name === 'NotAllowedError') {
+        setError('Biometric verification cancelled.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   Star, 
   Download, 
@@ -11,7 +12,10 @@ import {
   Share2,
   Calendar,
   HardDrive,
-  Code
+  Code,
+  X,
+  Copy,
+  Check
 } from 'lucide-react';
 import { AppRecord, Review } from '../types';
 import { supabase } from '../lib/supabase';
@@ -21,6 +25,8 @@ export const AppDetailPage: React.FC = () => {
   const [app, setApp] = useState<AppRecord | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchAppDetails();
@@ -75,19 +81,30 @@ export const AppDetailPage: React.FC = () => {
   };
 
   const handleShare = async () => {
+    setIsShareModalOpen(true);
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleNativeShare = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
           title: app?.name,
-          text: app?.description,
+          text: `Check out ${app?.name} on Nexus App Store!`,
           url: window.location.href,
         });
       } catch (err) {
         console.error('Error sharing:', err);
       }
-    } else {
-      await navigator.clipboard.writeText(window.location.href);
-      alert('Link copied to clipboard!');
     }
   };
 
@@ -278,6 +295,79 @@ export const AppDetailPage: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Share Modal */}
+      <AnimatePresence>
+        {isShareModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-neutral-100 flex justify-between items-center">
+                <h3 className="text-xl font-display font-bold">Share App</h3>
+                <button 
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-neutral-400" />
+                </button>
+              </div>
+              
+              <div className="p-8 flex flex-col items-center text-center">
+                <div className="bg-neutral-50 p-6 rounded-3xl mb-6 border border-neutral-100">
+                  <QRCodeSVG 
+                    value={window.location.href} 
+                    size={180}
+                    level="H"
+                    includeMargin={false}
+                    imageSettings={{
+                      src: app?.icon_url || '',
+                      x: undefined,
+                      y: undefined,
+                      height: 40,
+                      width: 40,
+                      excavate: true,
+                    }}
+                  />
+                </div>
+                
+                <h4 className="text-lg font-bold text-neutral-900 mb-1">{app?.name}</h4>
+                <p className="text-sm text-neutral-500 mb-6">Scan this QR code to download directly on your device</p>
+                
+                <div className="w-full space-y-3">
+                  <div className="flex items-center gap-2 p-3 bg-neutral-50 rounded-2xl border border-neutral-200">
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value={window.location.href}
+                      className="flex-1 bg-transparent text-xs text-neutral-600 outline-none truncate"
+                    />
+                    <button 
+                      onClick={copyToClipboard}
+                      className="p-2 hover:bg-neutral-200 rounded-xl transition-colors shrink-0"
+                    >
+                      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-neutral-400" />}
+                    </button>
+                  </div>
+                  
+                  {navigator.share && (
+                    <button 
+                      onClick={handleNativeShare}
+                      className="w-full py-3 bg-neutral-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 transition-all"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      More Options
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -23,6 +23,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { AppRecord, AppVersion } from '../types';
 import { supabase, syncToGoogleSheet } from '../lib/supabase';
+import { bufferToBase64, generateRandomChallenge } from '../lib/webauthn';
 
 export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'review' | 'settings'>('dashboard');
@@ -96,16 +97,70 @@ export const AdminDashboard: React.FC = () => {
     }
 
     try {
-      // In a real app, you'd get these options from your server
-      // For this demo, we'll simulate the registration
-      alert('Registering Biometric Credential... Please follow your browser\'s prompts.');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const challenge = generateRandomChallenge();
+      const userId = new TextEncoder().encode(user.id);
+
+      const options: PublicKeyCredentialCreationOptions = {
+        challenge,
+        rp: {
+          name: "Nexus App Store",
+          id: window.location.hostname,
+        },
+        user: {
+          id: userId,
+          name: user.email || "Admin",
+          displayName: user.email || "Admin",
+        },
+        pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          userVerification: "required",
+        },
+        timeout: 60000,
+        attestation: "none",
+      };
+
+      const credential = (await navigator.credentials.create({
+        publicKey: options,
+      })) as PublicKeyCredential;
+
+      if (!credential) throw new Error('Credential creation failed');
+
+      const response = credential.response as AuthenticatorAttestationResponse;
       
-      // Mocking successful enrollment
-      localStorage.setItem('nexus_biometric_cred', 'enrolled');
+      // Store the credential info
+      // In a real app, you'd send this to your server to verify and store
+      const credentialData = {
+        credentialId: bufferToBase64(credential.rawId),
+        publicKey: bufferToBase64(response.getPublicKey()),
+        userId: user.id
+      };
+
+      // For this demo, we'll store it in localStorage to simulate a database
+      // But we'll also try to save it to Supabase if the table exists
+      localStorage.setItem('nexus_biometric_cred', JSON.stringify(credentialData));
+      
+      try {
+        await supabase.from('admin_biometrics').insert([{
+          user_id: user.id,
+          credential_id: credentialData.credentialId,
+          public_key: credentialData.publicKey
+        }]);
+      } catch (e) {
+        console.warn('Could not save to Supabase table, falling back to local storage only');
+      }
+
       alert('Biometric enrollment successful! You can now log in using your fingerprint/face ID.');
     } catch (err: any) {
       console.error('Biometric enrollment error:', err);
-      alert('Enrollment failed: ' + err.message);
+      if (err.name === 'NotAllowedError') {
+        alert('Enrollment cancelled or timed out.');
+      } else {
+        alert('Enrollment failed: ' + err.message);
+      }
     }
   };
 
